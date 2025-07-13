@@ -124,6 +124,6 @@ commands:
 ```
 
 ## Shoutouts
-Loader* - [https://github.com/Logan-Elliott/HollowGhost](https://github.com/Logan-Elliott/HollowGhost)
-Macro AMSI Bypass via Patch - [https://github.com/hackinaggie/OSEP-Tools-v2/blob/main/Macros/WordMacroRunner.vbs](https://github.com/hackinaggie/OSEP-Tools-v2/blob/main/Macros/WordMacroRunner.vbs)
+* Loader* - [https://github.com/Logan-Elliott/HollowGhost](https://github.com/Logan-Elliott/HollowGhost)
+* Macro AMSI Bypass via Patch - [https://github.com/hackinaggie/OSEP-Tools-v2/blob/main/Macros/WordMacroRunner.vbs](https://github.com/hackinaggie/OSEP-Tools-v2/blob/main/Macros/WordMacroRunner.vbs)
 

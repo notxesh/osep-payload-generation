@@ -5,7 +5,7 @@ The goal was to automate as much annoying "manual labor" as possible while still
 
 It's pretty jank but hey it works :)
 
-## Usag
+## Usage
 ```bash
 python3 generate.py -h                                
 usage: generate.py [-h] [-l LHOST] [-p PAYLOAD] [-L] [-v]
